@@ -81,6 +81,7 @@ class Rating(models.Model):
 
     good = models.ForeignKey('Goods', on_delete=models.CASCADE)
     rate = models.CharField(max_length=1, choices=SCORE)
+    user = models.ForeignKey('User', on_delete=models.CASCADE)
 
     def __str__(self):
         return f'{self.good.pk} - {self.rate}'
