@@ -50,47 +50,47 @@ class GoodsAPI(APIView):
     permission_classes = (AllowAny, )
 
     def get(self, request):
-        if request.GET.get('goods', None):
+        if request.GET.get('goods', None) and request.GET.get('rate', None) == "true":
             rates = Rating.objects.filter(good=request.GET.get('goods'))
             rates_sum = sum(list(map(lambda x: int(x.rate), rates)))
-            rates_sr = round(rates_sum/len(rates))
+            rates_sr = round(rates_sum/len(rates), 1)
 
             return Response({'rates': rates_sr})
+
+        elif request.GET.get('goods', None) and request.GET.get('rate', None) == "true":
+            good = Goods.objects.get(id=request.GET.get('goods', None))
+            return Response({'get': {'name': good.name, 'desc': good.desc, 'cost': good.cost}})
 
         goods = Goods.objects.all()
         return Response({'get': [{'name': good.name, 'desc': good.desc, 'cost':good.cost}] for good in goods})
 
     def post(self, request):
-        current_user = request.user
         good = Goods.objects.get(id=request.data.get('goods'))
+        user = User.objects.get(id=request.user.id)
 
-        if current_user.id is None:
+        if request.user.id is None:
             return Response({'post': 'error', 'data': 'post unsuccessful'})
 
         if not request.data.get('count', None) is None:
-            user = User.objects.get(id=current_user.id)
             count = request.data.get('count')
 
-            try:
-                good_add = self.get_basket_data(user, good)
-                Basket.objects.update(user=user, goods=good, count=good_add.count+count)
-            except:
-                good_add = Basket.objects.create(user=user, goods=good, count=count)
-                good_add.save()
+            Basket.objects.create(goods=good, user=user, count=count).save()
+            all_goods_basket = Basket.objects.filter(user=user, goods=good)
+            sum_count_goods = sum(list(map(lambda x: int(x.count), all_goods_basket)))
 
-            return Response({'post': {"user": user.id, "goods": good.id, "count": good_add.count+count}, 'data': 'post successful'})
+            return Response({'post': {"user": user.id, "goods": good.id, "count": sum_count_goods}, 'data': 'post successful'})
 
         elif not request.data.get('rate', None) is None:
             rate = request.data.get('rate')
-            good_add = Rating.objects.create(rate=rate, good=good)
-            good_add.save()
+            try:
+                Rating.objects.get(user=user)
+            except:
+                good_add = Rating.objects.create(rate=rate, good=good, user=user)
+                good_add.save()
 
-            return Response({'post': {"rate": good_add.rate, "goods": good.id}, 'data': 'post successful'})
+                return Response({'post': {"rate": good_add.rate, "goods": good.id}, 'data': 'post successful'})
 
         return Response({'post': 'error', 'data': 'post unsuccessful'})
-
-    def get_basket_data(self, user, good):
-        return Basket.objects.get(user=user, goods=good)
 
 class ProfileAPI(APIView):
     permission_classes = (IsAuthenticated, )
@@ -118,4 +118,4 @@ class ProfileAPI(APIView):
         serializers.is_valid(raise_exception=True)
         serializers.save()
 
-        return Response({'post': serializers.data, 'data': 'put successful'})
+        return Response({'put': serializers.data, 'data': 'put successful'})
